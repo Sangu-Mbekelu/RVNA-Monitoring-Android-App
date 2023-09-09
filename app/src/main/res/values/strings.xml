@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Phone_Monitoring_Application</string>
+    <string name="ssh_button_name">Connect to Server</string>
+    <string name="folder_text_enter_name">Enter Server Folder Name</string>
+    <string name="title_activity_graph_view">Graph_View</string>
+    <string name="xAxis">Elapsed Time [min]</string>
+    <string name="yAxis">Inflection Frequency [MHz]\n\n\n\n\n\n\n\n\n\n</string>
+    <string name="GraphTitle">Inflection Frequency Over Time</string>
+
+</resources>
