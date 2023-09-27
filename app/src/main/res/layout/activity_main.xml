@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/login_background"
+    android:background="@color/white"
     tools:context=".MainActivity">
 
     <EditText
@@ -15,8 +15,9 @@
         android:hint="@string/folder_text_enter_name"
         android:inputType="text"
         android:textAlignment="center"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/graph_color"
         android:textSize="25sp"
+        android:background="@null"
         app:layout_constraintBottom_toTopOf="@+id/SshButton"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

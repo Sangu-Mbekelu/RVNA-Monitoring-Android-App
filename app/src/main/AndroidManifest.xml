@@ -15,9 +15,13 @@
         android:theme="@style/Theme.Phone_Monitor_App"
         tools:targetApi="31">
         <activity
+            android:name=".GraphSettings"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".GraphView"
             android:exported="false"
-            android:screenOrientation="landscape"/>
+            android:screenOrientation="landscape" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

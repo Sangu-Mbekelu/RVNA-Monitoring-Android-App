@@ -6,5 +6,12 @@
     <string name="xAxis">Elapsed Time [min]</string>
     <string name="yAxis">Inflection Frequency [MHz]\n\n\n\n\n\n\n\n\n\n</string>
     <string name="GraphTitle">Inflection Frequency Over Time</string>
+    <string name="settings_button_name">Save Settings</string>
+    <string name="settings_smoothing">Moving Average Smoothing: </string>
+    <string name="setting_xmax">X Max: </string>
+    <string name="setting_xmin">X Min: </string>
+    <string name="setting_ymax">Y Max: </string>
+    <string name="setting_ymin">Y Min: </string>
+    <string name="settings_description">settings</string>
 
 </resources>

@@ -20,6 +20,9 @@ import java.io.ByteArrayInputStream
 // Function used to just retrieve and return file data
 class ServerActivity(private val dirname: String) : AppCompatActivity(), CoroutineScope by MainScope() {
 
+    companion object{
+        var previous_data = mutableListOf<Data>()
+    }
     // These two variables are initialized in order to allow for reconnection
     private lateinit var serverSession: SSH // SSH session variable
     private lateinit var serverSCP: SSHScp // SSH file transfer session variable
@@ -67,8 +70,9 @@ class ServerActivity(private val dirname: String) : AppCompatActivity(), Corouti
 
 
     // FUNCTION USED TO CONNECT TO GET DATA LOG FROM SERVER
-    suspend fun getServerData(): List<Data>? {
+    suspend fun getServerData(): Pair<List<Data>?, MutableList<Data>> {
         val graphingData = coroutineScope {
+
             val graphingData = withContext(Dispatchers.IO) {
 
                 val dataLog: ByteArray?  // Initializing the dataLog string that will include file data
@@ -91,12 +95,13 @@ class ServerActivity(private val dirname: String) : AppCompatActivity(), Corouti
                     dataLog = serverSCP.getBytes(serverInfo.remotepath + dirname + "/0_data_log.txt")
 
                 } catch (e: Exception) {
-                    return@withContext null // If connection or file transfer goes wrong, return
+                    return@withContext Pair(null, previous_data) // If connection or file transfer goes wrong, return
                 }
-
+                val data = readCsv(ByteArrayInputStream(dataLog))
+                previous_data = data.toMutableList()
                 // Generated List will be returned as graphingData
-                return@withContext readCsv(ByteArrayInputStream(dataLog))
-            } ?: return@coroutineScope null // Elvis operator
+                return@withContext Pair(data, previous_data)
+            }
 
             return@coroutineScope graphingData
         }
@@ -104,8 +109,9 @@ class ServerActivity(private val dirname: String) : AppCompatActivity(), Corouti
     }
 
     // FUNCTION USED TO CONNECT TO GET DATA LOG FROM SERVER
-    suspend fun getServerDataShorter(): List<Data>? {
+    suspend fun getServerDataShorter(): Pair<List<Data>?, MutableList<Data>> {
         val graphingData = coroutineScope {
+
             val graphingData = withContext(Dispatchers.IO) {
 
                 val dataLog: ByteArray?  // Initializing the dataLog string that will include file data
@@ -115,12 +121,13 @@ class ServerActivity(private val dirname: String) : AppCompatActivity(), Corouti
                     dataLog = serverSCP.getBytes(serverInfo.remotepath + dirname + "/0_data_log.txt")
 
                 } catch (e: Exception) {
-                    return@withContext null // If connection or file transfer goes wrong, return
+                    return@withContext Pair(null, previous_data) // If connection or file transfer goes wrong, return
                 }
-
+                val data = readCsv(ByteArrayInputStream(dataLog))
+                previous_data = data.toMutableList()
                 // Generated List will be returned as graphingData
-                return@withContext readCsv(ByteArrayInputStream(dataLog))
-            } ?: return@coroutineScope null // Elvis operator
+                return@withContext Pair(data, previous_data)
+            }
 
             return@coroutineScope graphingData
         }
@@ -137,13 +144,11 @@ class ServerActivity(private val dirname: String) : AppCompatActivity(), Corouti
                 .drop(1)// Drops the header
                 .map {
                     Data(
-                        elapsedTime = it[3].toDouble() / 60,
-                        inflectionFrequency = it[4].toDouble()/1E6
+                        elapsedTime = it[3].toDouble() / 60, // data in 3rd column
+                        inflectionFrequency = it[4].toDouble()/1E6 // data in 4th column
                     )
                 }
 }
 
-
 // Class used to contain list of values from CSV
 data class Data(val elapsedTime: Double, val inflectionFrequency: Double)
-

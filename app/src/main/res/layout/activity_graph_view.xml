@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/pink_background"
+    android:background="@color/white"
     tools:context=".GraphView">
 
     <com.github.mikephil.charting.charts.LineChart
@@ -51,5 +51,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintVertical_bias="0.5"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:id="@+id/settings"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/gear_icon"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0"
+        android:contentDescription="@string/settings_description"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

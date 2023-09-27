@@ -68,5 +68,18 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+}
 
+class DataSettings {
+    companion object{
+        var data_smoothing: Int = 15
+
+        var Xmin: Int = 0
+
+        var Xmax: Int = 60
+
+        var Ymin: Int = 1000
+
+        var Ymax: Int = 1500
+    }
 }
