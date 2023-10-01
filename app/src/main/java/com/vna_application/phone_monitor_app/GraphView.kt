@@ -45,9 +45,6 @@ class GraphView : AppCompatActivity() {
         // Getting value of folderName
         val folderName = intent.getStringExtra("folderName")
 
-        // Initializing ServerActivity Object
-        val serverSession = ServerActivity(folderName.toString())
-
         // Initializing Chart
         chart = findViewById(R.id.LineChart)
 
