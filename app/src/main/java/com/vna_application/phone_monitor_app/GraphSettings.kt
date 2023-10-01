@@ -86,7 +86,7 @@ class GraphSettings : AppCompatActivity() {
         // Disables back on phone to go back to previous Activity
         onBackPressedDispatcher.addCallback(this, object:OnBackPressedCallback(true){
             override fun handleOnBackPressed() {
-                Toast.makeText(this@GraphSettings, "Press Button to go back", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@GraphSettings, "Save Setting Button also works as a Back Button", Toast.LENGTH_SHORT).show()
             }
         })
     }

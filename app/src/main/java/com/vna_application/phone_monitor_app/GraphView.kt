@@ -7,20 +7,30 @@ import android.os.Looper
 import android.widget.ImageButton
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import kossh.impl.SSH
+import kossh.impl.SSHOptions
+import kossh.impl.SSHScp
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import org.apache.commons.csv.CSVFormat
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 class GraphView : AppCompatActivity() {
 
     private lateinit var chart:LineChart
+    private lateinit var serverSSH: SSH // SSH session variable
+    private lateinit var serverSCP: SSHScp // SSH file transfer session variable
+    private var serverInfo = ServerUser()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_graph_view)
@@ -73,65 +83,10 @@ class GraphView : AppCompatActivity() {
 
         // Initializes data set val
         var dataSet: LineDataSet
-        // Async function used to grab graphing data for plotting
-        val graphingData = lifecycleScope.async {serverSession.getServerData()}
-
-        // Action taken when the async function is finished and an exception isn't thrown
-        graphingData.invokeOnCompletion {
-            if(it == null){
-                val data_pair: Pair<List<Data>?, MutableList<Data>> = graphingData.getCompleted()
-
-                var data = data_pair.first
-
-                if(data_pair.first == null){connection=0; data = data_pair.second} // connection failed
-
-                if(data_pair.first!!.size < data_pair.second.size) {data = data_pair.second}
-
-                val elapsedTimeList = mutableListOf<Float>()
-                val frequencyList = mutableListOf<Float>()
-
-                if (data != null) {
-                    for(i in data.indices){
-                        elapsedTimeList.add(data[i].elapsedTime.toFloat())
-                        frequencyList.add(data[i].inflectionFrequency.toFloat())
-                    }
-                } else {return@invokeOnCompletion}
-
-                // If statement placed here so that the data smoothing only starts as soon as there's enough data
-                if (data.size > DataSettings.data_smoothing) {
-                    val frequencyMovingAverage = frequencyList.windowed(DataSettings.data_smoothing, 1) { it.average() }
-
-                    // iterates through length of data list to add to graph array
-                    for (i in frequencyMovingAverage.indices) {
-                        dataPoints.add(Entry(elapsedTimeList[i + (DataSettings.data_smoothing - 1)], frequencyMovingAverage[i].toFloat()))
-                    }
-                } else {
-                    for (i in frequencyList.indices) {
-                        dataPoints.add(Entry(elapsedTimeList[i], frequencyList[i]))
-                    }
-                }
-
-                // Adds list of values to dataSet
-                dataSet = LineDataSet(dataPoints, "Inflection Frequency")
-                // Sets desired parameters
-                dataSet.setDrawFilled(false)
-                dataSet.setDrawValues(false)
-                dataSet.setDrawHighlightIndicators(false)
-                dataSet.setDrawCircleHole(false)
-                dataSet.setDrawCircles(false)
-                dataSet.lineWidth = 3f
-                dataSet.color = resources.getColor(R.color.graph_color)
-
-                // Sets data object as dataset and refreshes view
-                chart.data = LineData(dataSet)
-                chart.invalidate()
-            }
-        }
-
 
         // Handler runs the updateGraph Runnable interface
         val graphHandler = Handler(Looper.getMainLooper())
-
+        println("Here?")
         // updateGraph will run every 10 seconds to update the graph displayed on phone
         // will check for connection, If disconnected, will attempt reconnection.
         // If attempt falls, updateGraph returns and will be run 5 secs later
@@ -141,134 +96,85 @@ class GraphView : AppCompatActivity() {
 
         graphHandler.post(object : Runnable {
             override fun run() {
-                if (connection == 0) {
-                    // Async function used to grab graphing data for plotting
-                    val updatedData = lifecycleScope.async { serverSession.getServerData() }
+                // Async function used to grab graphing data for plotting
+                val updatedData = GlobalScope.async {
 
-                    // Action taken when the async function is finished and an exception isn't thrown
-                    updatedData.invokeOnCompletion {
-                        if (it == null) {
-                            val data_pair: Pair<List<Data>?, MutableList<Data>> = graphingData.getCompleted()
+                    try {
+                        // SSH parameters used to start session
+                        val serverLogin = SSHOptions(
+                            host = serverInfo.host,
+                            username = serverInfo.user,
+                            password = serverInfo.password
+                        )
 
-                            var data = data_pair.first
+                        // Starts SSH session
+                        serverSSH = SSH(serverLogin)
 
-                            if(data_pair.first == null){
-                                connection=0
-                                data = data_pair.second
-                            } // connection failed
+                        // Starts file transfer session using SCP protocol
+                        serverSCP = SSHScp(serverSSH)
+                        // Session gets data log file from server, turns information into a Byte Array
+                        val dataLog =
+                            serverSCP.getBytes(serverInfo.remotepath + folderName + "/0_data_log.txt")
 
-                            if(data_pair.first!!.size < data_pair.second.size) {data = data_pair.second}
+                        return@async readCsv(ByteArrayInputStream(dataLog))
 
-                            connection = 1 // Connection is re-established
-
-                            // Clearing data in order to reenter
-                            dataPoints.clear()
-
-                            val elapsedTimeList = mutableListOf<Float>()
-                            val frequencyList = mutableListOf<Float>()
-
-                            if (data != null) {
-                                for(i in data!!.indices){
-                                    elapsedTimeList.add(data!![i].elapsedTime.toFloat())
-                                    frequencyList.add(data!![i].inflectionFrequency.toFloat())
-                                }
-                            } else {return@invokeOnCompletion}
-
-                            // If statement placed here so that the data smoothing only starts as soon as there's enough data
-                            if (data!!.size > DataSettings.data_smoothing) {
-                                val frequencyMovingAverage = frequencyList.windowed(DataSettings.data_smoothing, 1) { it.average() }
-
-                                // iterates through length of data list to add to graph array
-                                for (i in frequencyMovingAverage.indices) {
-                                    dataPoints.add(Entry(elapsedTimeList[i + (DataSettings.data_smoothing - 1)], frequencyMovingAverage[i].toFloat()))
-                                }
-                            } else {
-                                for (i in frequencyList.indices) {
-                                    dataPoints.add(Entry(elapsedTimeList[i], frequencyList[i]))
-                                }
-                            }
-
-                            // Adds list of values to dataSet
-                            dataSet = LineDataSet(dataPoints, "Inflection Frequency")
-                            // Sets desired parameters
-                            dataSet.setDrawFilled(false)
-                            dataSet.setDrawValues(false)
-                            dataSet.setDrawHighlightIndicators(false)
-                            dataSet.setDrawCircleHole(false)
-                            dataSet.setDrawCircles(false)
-                            dataSet.lineWidth = 3f
-                            dataSet.color = resources.getColor(R.color.graph_color)
-
-                            // Sets data object as dataset and refreshes view
-                            chart.data = LineData(dataSet)
-                            chart.invalidate()
-                        }
-                    }
-                } else {
-                    // Async function used to grab graphing data for plotting
-                    val updatedData = lifecycleScope.async { serverSession.getServerDataShorter() }
-
-                    // Action taken when the async function is finished and an exception isn't thrown
-                    updatedData.invokeOnCompletion {
-                        if (it == null) {
-                            val data_pair: Pair<List<Data>?, MutableList<Data>> = graphingData.getCompleted()
-
-                            var data = data_pair.first
-
-                            if(data_pair.first == null){
-                                connection=0
-                                data = data_pair.second
-                            } // connection failed
-
-                            if(data_pair.first!!.size < data_pair.second.size) {data = data_pair.second}
-
-                            // Clearing data in order to reenter
-                            dataPoints.clear()
-
-                            val elapsedTimeList = mutableListOf<Float>()
-                            val frequencyList = mutableListOf<Float>()
-
-                            if (data != null) {
-                                for(i in data!!.indices){
-                                    elapsedTimeList.add(data!![i].elapsedTime.toFloat())
-                                    frequencyList.add(data!![i].inflectionFrequency.toFloat())
-                                }
-                            } else {return@invokeOnCompletion}
-
-                            // If statement placed here so that the data smoothing only starts as soon as there's enough data
-                            if (data!!.size > DataSettings.data_smoothing) {
-                                val frequencyMovingAverage = frequencyList.windowed(DataSettings.data_smoothing, 1) { it.average() }
-
-                                // iterates through length of data list to add to graph array
-                                for (i in frequencyMovingAverage.indices) {
-                                    dataPoints.add(Entry(elapsedTimeList[i + (DataSettings.data_smoothing - 1)], frequencyMovingAverage[i].toFloat()))
-                                }
-                            } else {
-                                for (i in frequencyList.indices) {
-                                    dataPoints.add(Entry(elapsedTimeList[i], frequencyList[i]))
-                                }
-                            }
-
-                            // Adds list of values to dataSet
-                            dataSet = LineDataSet(dataPoints, "Inflection Frequency")
-                            // Sets desired parameters
-                            dataSet.setDrawFilled(false)
-                            dataSet.setDrawValues(false)
-                            dataSet.setDrawHighlightIndicators(false)
-                            dataSet.setDrawCircleHole(false)
-                            dataSet.setDrawCircles(false)
-                            dataSet.lineWidth = 3f
-                            dataSet.color = resources.getColor(R.color.graph_color)
-
-                            // Sets data object as dataset and refreshes view
-                            chart.data = LineData(dataSet)
-                            chart.invalidate()
-                        }
+                    } catch (e: Exception) {
+                        return@async null // If connection or file transfer goes wrong, return
                     }
                 }
-                graphHandler.postDelayed(this, 10000) // Handler runs the same code again after 10 seconds
+
+                updatedData.invokeOnCompletion {
+                    if (it == null) {
+                        val data: List<Data>? = updatedData.getCompleted()
+
+                        if(data == null){ println("RETURNING?"); return@invokeOnCompletion}
+
+                        val elapsedTimeList = mutableListOf<Float>()
+                        val frequencyList = mutableListOf<Float>()
+
+                        for(i in data.indices){
+                            elapsedTimeList.add(data[i].elapsedTime.toFloat())
+                            frequencyList.add(data[i].inflectionFrequency.toFloat())
+                        }
+
+                        // Clearing data in order to reenter
+                        dataPoints.clear()
+
+                        // If statement placed here so that the data smoothing only starts as soon as there's enough data
+                        if (data.size > DataSettings.data_smoothing) {
+                            val frequencyMovingAverage = frequencyList.windowed(DataSettings.data_smoothing, 1) { it.average() }
+                            // iterates through length of data list to add to graph array
+                            for (i in frequencyMovingAverage.indices) {
+                                dataPoints.add(Entry(elapsedTimeList[i + (DataSettings.data_smoothing - 1)], frequencyMovingAverage[i].toFloat()))
+                            }
+                        } else {
+                            // iterates through length of data list to add to graph array
+                            for (i in frequencyList.indices) {
+                                dataPoints.add(Entry(elapsedTimeList[i], frequencyList[i]))
+                            }
+                        }
+
+                        // Adds list of values to dataSet
+                        dataSet = LineDataSet(dataPoints, "Inflection Frequency")
+                        // Sets desired parameters
+                        dataSet.setDrawFilled(false)
+                        dataSet.setDrawValues(false)
+                        dataSet.setDrawHighlightIndicators(false)
+                        dataSet.setDrawCircleHole(false)
+                        dataSet.setDrawCircles(false)
+                        dataSet.lineWidth = 3f
+                        dataSet.color = resources.getColor(R.color.graph_color)
+
+                        // Sets data object as dataset and refreshes view
+                        chart.data = LineData(dataSet)
+                        chart.invalidate()
+                    }
+                }
+
+                graphHandler.postDelayed(this, 10000) // Handler runs the same code again after 5 seconds
             }
         })
+
 
         settingsButton.setOnClickListener{
             // Intent initializes and executes with startActivity to start another Activity
@@ -281,6 +187,21 @@ class GraphView : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object:OnBackPressedCallback(true){ override fun handleOnBackPressed() {} })
     }
 
+    // Function taken from https://www.baeldung.com/kotlin/csv-files using Apache CSV Library
+    // to read and parse CSV Byte Array
+    fun readCsv(inputStream: InputStream): List<Data> =
+        CSVFormat.Builder.create(CSVFormat.DEFAULT).apply {
+            setIgnoreSurroundingSpaces(true)
+        }.build().parse(inputStream.reader())
+            .drop(1)// Drops the header
+            .map {
+                Data(
+                    elapsedTime = it[3].toDouble() / 60,
+                    inflectionFrequency = it[4].toDouble()/1E6
+                )
+            }
+
+
     override fun onResume() {
         super.onResume()
         chart.xAxis.axisMinimum = DataSettings.Xmin.toFloat()
@@ -289,3 +210,8 @@ class GraphView : AppCompatActivity() {
         chart.axisLeft.axisMaximum = DataSettings.Ymax.toFloat()
     }
 }
+
+
+
+// Class used to contain list of values from CSV
+data class Data(val elapsedTime: Double, val inflectionFrequency: Double)
