@@ -29,7 +29,9 @@ class GraphView : AppCompatActivity() {
     private lateinit var serverSSH: SSH // SSH session variable
     private lateinit var serverSCP: SSHScp // SSH file transfer session variable
     private var serverInfo = ServerUser()
-
+    // Handler runs the updateGraph Runnable interface
+    private val graphHandler = Handler(Looper.getMainLooper())
+    private var graphRunnable: Runnable? = null
     @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,16 +84,15 @@ class GraphView : AppCompatActivity() {
         var dataSet: LineDataSet
 
         // Handler runs the updateGraph Runnable interface
-        val graphHandler = Handler(Looper.getMainLooper())
-        println("Here?")
+        //val graphHandler = Handler(Looper.getMainLooper())
+
         // updateGraph will run every 10 seconds to update the graph displayed on phone
         // will check for connection, If disconnected, will attempt reconnection.
         // If attempt falls, updateGraph returns and will be run 5 secs later
         // If connected, a shorter version of gathering the data log without the session start
         // will be called
         // Code matches graphingData associated code at the top of this interface
-
-        graphHandler.post(object : Runnable {
+        graphRunnable = object : Runnable {
             override fun run() {
                 // Async function used to grab graphing data for plotting
                 val updatedData = GlobalScope.async {
@@ -122,9 +123,7 @@ class GraphView : AppCompatActivity() {
 
                 updatedData.invokeOnCompletion {
                     if (it == null) {
-                        val data: List<Data>? = updatedData.getCompleted()
-
-                        if(data == null){ println("RETURNING?"); return@invokeOnCompletion}
+                        val data: List<Data> = updatedData.getCompleted() ?: return@invokeOnCompletion
 
                         val elapsedTimeList = mutableListOf<Float>()
                         val frequencyList = mutableListOf<Float>()
@@ -167,11 +166,12 @@ class GraphView : AppCompatActivity() {
                         chart.invalidate()
                     }
                 }
-
+                println("INVOKED")
                 graphHandler.postDelayed(this, 10000) // Handler runs the same code again after 5 seconds
             }
-        })
+        }
 
+        graphHandler.post(graphRunnable as Runnable)
 
         settingsButton.setOnClickListener{
             // Intent initializes and executes with startActivity to start another Activity
@@ -181,7 +181,13 @@ class GraphView : AppCompatActivity() {
 
 
         // Disables back on phone to go back to previous Activity
-        onBackPressedDispatcher.addCallback(this, object:OnBackPressedCallback(true){ override fun handleOnBackPressed() {} })
+        //onBackPressedDispatcher.addCallback(this, object:OnBackPressedCallback(true){ override fun handleOnBackPressed() {} })
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        graphHandler.removeCallbacksAndMessages(null)
+        super.onBackPressed()
     }
 
     // Function taken from https://www.baeldung.com/kotlin/csv-files using Apache CSV Library

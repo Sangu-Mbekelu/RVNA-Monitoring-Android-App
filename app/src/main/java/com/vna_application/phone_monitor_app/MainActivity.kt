@@ -112,14 +112,14 @@ class MainActivity : AppCompatActivity() {
 // Class used to store graph variables
 class DataSettings {
     companion object{
-        var data_smoothing: Int = 15
+        var data_smoothing: Int = 1
 
         var Xmin: Int = 0
 
-        var Xmax: Int = 10
+        var Xmax: Int = 60
 
-        var Ymin: Int = 2200
+        var Ymin: Int = 1000
 
-        var Ymax: Int = 2700
+        var Ymax: Int = 1500
     }
 }
